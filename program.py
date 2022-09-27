@@ -15,7 +15,7 @@ def audio_stream():
 
     CHUNK = 1024
     FORMAT = pyaudio.paInt16
-    CHANNELS = 2
+    CHANNELS = 1
     RATE = 44100
 
     stream = p.open(format=FORMAT,
@@ -41,7 +41,7 @@ def cv2_draw(image):
     return image
 
 
-rtmp = f'rtmp://a.rtmp.youtube.com/live2/'
+rtmp = f'rtmp://a.rtmp.youtube.com/live2/keyut'
 
 cameraip = 0
 # cameraip="rtsp://..."
@@ -67,9 +67,8 @@ command = ['ffmpeg',
            '-pixel_format', 'bgr24',
            '-video_size', f"{width}x{height}",
            '-framerate', str(fps),
-           '-i', 'pipe:0',
-           #'-re',
-           #'-f', 'lavfi',
+           '-i', 'pipe:0',           
+           '-i', '1.mp3',
            '-c:v', 'libx264',
            '-maxrate', '500k',
            '-bufsize', '2500k',
@@ -79,12 +78,12 @@ command = ['ffmpeg',
            '-preset', 'ultrafast',
            '-crf', '28',
            '-g', '25',
-           #'-c:a', 'aac',
+           '-c:a', 'aac',
            '-vf', 'format=yuv420p',
            '-flvflags', 'no_duration_filesize',
            '-f', 'flv',
-           # rtmp
-           "/work/cameraip2youtubelive/program.mp4"
+           rtmp
+           #"/work/cameraip2youtubelive/program.mp4"
            ]
 
 pipe = subprocess.Popen(command, shell=False, stdin=subprocess.PIPE,
@@ -102,8 +101,8 @@ while cap.isOpened():
 
         pipe.stdin.write(frame.tobytes())
         # pipe.communicate(frame.tobytes())
-        pipe.stdin.write(streamAud.read(chunk))
-
+        #pipe.stdin.write(streamAud.read(chunk))
+        
         cv2.imshow("cam0", frame)
         cv2.waitKey(1)
 
