@@ -39,13 +39,12 @@ def cv2_draw(image  ):
     
     return image
 
-rtmp = f'rtmp://a.rtmp.youtube.com/live2/youkey'
-
+rtmp = f'rtmp://a.rtmp.youtube.com/live2/keyu'
 
 cameraip=0 
 ## cameraip="rtsp://..."
 
-(streamAud,pAud, chunk)= audio_stream()
+#(streamAud,pAud, chunk)= audio_stream()
 
 cap = cv2.VideoCapture(cameraip)
 
@@ -54,50 +53,45 @@ height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 fps = int(cap.get(cv2.CAP_PROP_FPS))
 
 print(width, height,fps)
-# width=1280
-# height=720
-# fps=16
+#width=1280
+#height=720
+#fps=8
 
 command = ['ffmpeg',
+           '-threads','4',
            '-y',
            '-f', 'rawvideo',
+           '-vcodec','rawvideo',
            '-pixel_format', 'bgr24',
            '-video_size', f"{width}x{height}",
            '-framerate', str(fps),
-           #'-re',           
+           '-re',           
            '-i', 'pipe:0',
-           '-preset', 'veryfast' ,
+           #'-i', '-',           
            '-maxrate', '500k',
-           '-bufsize', '2500k',
-           #'-re',
-           '-f', 'lavfi',
-           #'-i', 'pipe:1',
-           '-c:v', 'libx264',
+           '-bufsize', '2500k',           
+           '-f', 'lavfi',           
+           #'-i', 'pipe:1',           
+           '-c:v', 'libx264',       
+        '-tune' ,'zerolatency',
+        '-pix_fmt', 'nv12',
+        '-vprofile' ,'baseline',
+        '-preset', 'ultrafast',
+        '-crf', '28',
+        '-g', '25',        
            #'-c:a', 'aac',
-           '-vf', 'format=yuv420p',
+           '-an',
+           #'-vf', 'format=yuv420p',
+           '-flvflags' ,'no_duration_filesize' ,
            '-f', 'flv',
-           rtmp]
+           rtmp
+           #"/work/cameraip2youtubelive/program.mp4"
+           ]
 
 
-# command=[
-    
-#     'ffmpeg',
-#     '-re',
-#     '-video_size', f"{width}x{height}",
-#     '-framerate', str(fps),
-#     '-i' ,'pipe:0' ,
-#     '-vcodec', 'libx264' ,
-#     '-preset', 'veryfast' ,
-#     '-maxrate', '500k',
-#     '-bufsize', '2500k',
-#     '-vf', "format=yuv420p",
-#     '-g' ,'60' ,
-#     #-acodec libmp3lame -b:a 198k -ar 44100 
-#     '-f' ,'flv' ,
-#     rtmp    
-# ]
-
-pipe = subprocess.Popen(command, shell=False, stdin=subprocess.PIPE)
+pipe = subprocess.Popen(command, shell=False, stdin=subprocess.PIPE,
+                        #stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL
+                        )
 
 while cap.isOpened():
     
@@ -109,6 +103,7 @@ while cap.isOpened():
         frame= cv2_draw(frame)
         
         pipe.stdin.write(frame.tobytes())
+        #pipe.communicate(frame.tobytes())
         #pipe.stdin.write(streamAud.read(chunk))
         
         cv2.imshow("cam0", frame)
