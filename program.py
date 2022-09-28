@@ -1,4 +1,7 @@
 from distutils.cmd import Command
+from queue import Empty, Queue
+from threading import Thread
+import time
 import cv2
 import subprocess
 import pyaudio
@@ -27,21 +30,24 @@ def audio_stream():
     return (stream, p, CHUNK)
 
 
-def cv2_draw(image):
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)  # gray scale image
+def cv2_draw_contours(image):
+    imagegray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)  # gray scale image
     #image = cv2.cvtColor(image, cv2.COLOR_BGR2LUV)
-    thresh, image = cv2.threshold(image, 125, 255, cv2.THRESH_BINARY_INV)
-    edges = cv2.Canny(image, 100, 300)
+    thresh, imagegray = cv2.threshold(imagegray, 70, 255, cv2.THRESH_BINARY_INV)
+    
+    edges = cv2.Canny(imagegray, 100, 200)
+    
     contours, hierarchy = cv2.findContours(
-        edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        edges, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+    
+    imagegray= cv2.cvtColor( imagegray, cv2.COLOR_GRAY2BGR)
+    
+    cv2.drawContours(imagegray, contours, -1, (255, 255, 0), 1)
+    
+    return imagegray
 
-    for idx, c in enumerate(contours):
-        cv2.drawContours(image, contours, idx, (0, 230, 255), 1)
 
-    return image
-
-
-rtmp = f'rtmp://a.rtmp.youtube.com/live2/keyut'
+rtmp = f'rtmp://a.rtmp.youtube.com/live2/keyxxx'
 
 cameraip = 0
 # cameraip="rtsp://..."
@@ -54,63 +60,157 @@ width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 fps = int(cap.get(cv2.CAP_PROP_FPS))
 
-print(width, height, fps)
-# width=1280
-# height=720
-# fps=8
+#width=480
+#height=320
 
-command = ['ffmpeg',
-           '-threads', '4',
+print(width, height, fps)
+
+class App:
+    def __init__(self):
+        self.appIsStop = False
+        self.framequeue = Queue()
+        self.framequeue_preprocess = Queue()
+        
+               
+        #self.vidH=width
+        # self.vidH=int(720*2)
+        # self.vidW= int(int(self.vidH*width)/height)
+        # self.vidCropH= int(self.vidH/4)
+        # self.vidCropW= int(self.vidW/4)
+        
+        self.vidH=height
+        self.vidW=width
+        
+        print(self.vidW, self.vidH)
+        self.command = ['ffmpeg',
+           '-threads', '0',
            '-y',
            '-f', 'rawvideo',
-           '-vcodec', 'rawvideo',
-           '-pixel_format', 'bgr24',
-           '-video_size', f"{width}x{height}",
-           '-framerate', str(fps),
-           '-i', 'pipe:0',           
+           '-pixel_format', 'bgr24',           
+           '-s', f"{self.vidW}x{self.vidH}",
+           #'-s','320x240',
+           '-framerate', f"{fps}",
+           #'-i', 'pipe:0',
+           '-i','-',           
+           '-stream_loop', '-1',
            '-i', '1.mp3',
            '-c:v', 'libx264',
+           '-vf', 'format=yuv420p,setsar=1:1',
+           #'-vf', 'format=yuv420p,setsar=1:1,scale=-1:720',
+           #'-vf', f'format=yuv420p,setsar=1:1,crop={self.vidCropW}:{self.vidCropH}:0:0',
+           #'-s','320x240',
            '-maxrate', '500k',
-           '-bufsize', '2500k',
+           '-bufsize', '1024k',
            '-tune', 'zerolatency',
-           '-pix_fmt', 'nv12',
            '-vprofile', 'baseline',
            '-preset', 'ultrafast',
-           '-crf', '28',
-           '-g', '25',
+           '-async', '1',
            '-c:a', 'aac',
-           '-vf', 'format=yuv420p',
+           '-b:v', '1M',
+           '-movflags', '+faststart',
            '-flvflags', 'no_duration_filesize',
-           '-f', 'flv',
-           rtmp
-           #"/work/cameraip2youtubelive/program.mp4"
+           
+        #    '-f', 'flv',
+        #    rtmp
+           
+           #'-an',
+           #"-f" ,"rtp", 
+           # "rtp://127.0.0.1:7234"
+            #ffplay rtp://127.0.0.1:7234
+           
+           "/work/cameraip2youtubelive/program.mp4"
            ]
+        pass
 
-pipe = subprocess.Popen(command, shell=False, stdin=subprocess.PIPE,
-                        #stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL
-                        )
 
-while cap.isOpened():
+app = App()
 
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
+#https://trac.ffmpeg.org/wiki/StreamingGuide
+"""
+https://gist.github.com/travelhawk/4537a79c11fa5e308e6645a0b434cf4f
+"""
 
-    success, frame = cap.read()
-    if success:
-        frame = cv2_draw(frame)
+def stream_youtube():
 
-        pipe.stdin.write(frame.tobytes())
-        # pipe.communicate(frame.tobytes())
-        #pipe.stdin.write(streamAud.read(chunk))
-        
-        cv2.imshow("cam0", frame)
-        cv2.waitKey(1)
+    pipe = subprocess.Popen(app.command, shell=False, stdin=subprocess.PIPE,
+                            #stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL
+                            )
+    lastframe = cv2.imread("bg.png")
 
-# streamAud.stop_stream()
-# streamAud.close()
-# pAud.terminate()
+    while app.appIsStop == False:
+        try:
+            qsize = app.framequeue_preprocess.qsize()
+            #print(f"qsize {qsize}")
+            if qsize <= 0:
+                frame = lastframe
+            else:
+                frame = app.framequeue_preprocess.get()
+                
+            pipe.stdin.write(frame.tobytes())
+            lastframe = frame            
+            
+        except Exception as ex:
+            print(ex)
+            pass
 
-cap.release()
-pipe.terminate()
+    pipe.terminate()
+
+
+def video_preprocess():
+    
+    while app.appIsStop == False:
+        frame = app.framequeue.get()
+
+        #print(frame.shape)
+                
+        frame = cv2_draw_contours(frame)
+
+        # frame = cv2.resize(frame, (app.vidH, app.vidH),
+        #                      interpolation=cv2.INTER_AREA)
+
+        app.framequeue_preprocess.put(frame)
+       
+        time.sleep(0.001)
+        pass
+
+
+def video_capture():
+
+    while app.appIsStop == False:
+        try:
+            if cap.isOpened() == False:
+                time.sleep(1)
+                continue
+
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                app.appIsStop = True
+                break
+
+            # for i in range(3):
+            success, frame = cap.read()
+
+            if success:
+                app.framequeue.put(frame)
+                # pipe.communicate(frame.tobytes())
+                # pipe.stdin.write(streamAud.read(chunk))
+        except Exception as ex:
+            print(ex)
+            pass
+    # streamAud.stop_stream()
+    # streamAud.close()
+    # pAud.terminate()
+
+    cap.release()
+
+
+tyoutube = Thread(target=stream_youtube, args=(), daemon=True)
+tvid = Thread(target=video_capture, args=(), daemon=True)
+tpreprocess = Thread(target=video_preprocess, args=(), daemon=True)
+
+tvid.start()
+tpreprocess.start()
+time.sleep(1)
+tyoutube.start()
+tvid.join()
 
 # https://stackoverflow.com/questions/68527762/pipe-opencv-and-pyaudio-to-ffmpeg-streaming-youtube-rtmp-from-python
