@@ -128,3 +128,6 @@ dmypy.json
 # Pyre type checker
 .pyre/
 program.mp4
+
+*.mp4
+*.mpg

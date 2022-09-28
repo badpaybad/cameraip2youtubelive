@@ -1,5 +1,5 @@
 from distutils.cmd import Command
-from queue import Empty, Queue,LifoQueue
+from queue import Empty, Queue, LifoQueue
 
 from re import T
 from threading import Thread
@@ -8,6 +8,7 @@ import cv2
 import subprocess
 import pyaudio
 import datetime
+import os
 
 
 def audio_stream():
@@ -47,11 +48,12 @@ def cv2_draw_contours(image):
     #imagegray= cv2.cvtColor( imagegray, cv2.COLOR_GRAY2BGR)
 
     cv2.drawContours(image, contours, -1, (255, 0, 255), 2)
-    
+
     cv2.putText(image, f"Nguyen Phan Du {datetime.datetime.now()}", (10, 50),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
 
     return image
+
 
 rtmp = f'rtmp://a.rtmp.youtube.com/live2/xxx'
 
@@ -91,23 +93,48 @@ class App:
 
         self.fps_g = self.fps * 2
         self.fps_sleep = (30 / self.fps) * 0.03
+        
+        self.pipeVid = "pipeVid.mp4"
+        self.pipeAud = "pipeAud.mp3"        
+        
+        self.UnlinkPipe()
+        
+        try:
+            os.mkfifo(self.pipeVid)
+        except:
+            pass
+        try:
+            os.mkfifo(self.pipeAud)
+        except:
+            pass
 
         print(self.vidW, self.vidH)
         self.command = ['ffmpeg',
                         '-threads', '0',
                         '-y',
+                        
                         '-re',
                         '-f', 'rawvideo',
                         '-pixel_format', 'bgr24',
                         '-s', f"{self.vidW}x{self.vidH}",
                         # '-s','320x240',
                         '-framerate', f"{self.fps}",
-                        #'-i', 'pipe:0',
+                        #'-i',   f"{self.pipeVid}",
                         '-i', '-',
+
                         '-stream_loop', '-1',
                         '-i', '1.mp3',
+                        # '-f', 'alsa',
+                        # '-ac', '2' ,
+                        # '-itsoffset', '00:00:00.1',
+                        # '-i','default',
+                        # '-re',
+                        # '-f', 'lavfi',
+                        # #'-i', f"{self.pipeAud}",
+                        # '-i','-',
+
                         '-c:v', 'libx264',
-                        '-vf', 'format=yuv420p,setsar=1:1,scale=-1:720',
+                        '-vf', 'format=yuv420p,setsar=1:1',
                         #'-vf', 'format=yuv420p,setsar=1:1,scale=-1:720',
                         #'-vf', f'format=yuv420p,setsar=1:1,crop={self.vidCropW}:{self.vidCropH}:0:0',
                         # '-s','320x240',
@@ -115,33 +142,51 @@ class App:
                         '-vprofile', 'baseline',
                         '-preset', 'veryfast',
                         '-async', '1',
+                        
                         '-c:a', 'aac',
                         '-g', f"{self.fps_g}",
                         '-b:v', '1984k',
-                        '-b:a', '96k',
-                        '-r',f"{self.fps}",
+                        #'-b:a', '96k',
+                        '-r', f"{self.fps}",
                         '-crf', '28',  # https://trac.ffmpeg.org/wiki/Encode/H.264
                         '-maxrate', '960k',
                         '-bufsize', '1920k',  # https://trac.ffmpeg.org/wiki/EncodingForStreamingSites
                         #'-strict', 'experimental',
+                        '-strict', '-2',
                         '-movflags', '+faststart',
                         '-flvflags', 'no_duration_filesize',
-                        '-flags','+global_header',
+                        '-flags', '+global_header',
 
-                         '-f', 'flv',
-                         rtmp
+                        # '-f', 'flv',
+                        # rtmp
 
                         # '-an',
                         #"-f" ,"rtp",
                         # "rtp://127.0.0.1:7234"
                         # ffplay rtp://127.0.0.1:7234
 
-                         #"/work/cameraip2youtubelive/program.mp4"
-            ]
-        
-        print(self.command )
-        pass
+                        "/work/cameraip2youtubelive/program.mp4"
+                        ]
 
+        # capture mic : ffmpeg -f alsa -ac 2 -itsoffset 00:00:00.5 -i default  -f video4linux2 -s 320x240 -r 25 -i /dev/video0 out.mpg
+        # xxx=f"ffmpeg -f alsa -ac 2 -itsoffset 00:00:00.5 -i default  -f video4linux2 -s 320x240 -r 25 -i /dev/video0 -c:a aac -c:v libx264 -vf format=yuv420p,setsar=1:1 -movflags +faststart -f flv  rtmp://a.rtmp.youtube.com/live2/keytube"
+        # print(xxx)
+        print(self.command)
+        pass
+    
+    def UnlinkPipe(self):       
+        
+        try:
+            os.unlink(self.pipeVid)
+        except:
+            pass
+        try:
+            os.unlink(self.pipeAud)
+        except:
+            pass
+       
+    def __del__(self):
+        self.UnlinkPipe()
 
 app = App()
 
@@ -150,14 +195,33 @@ app = App()
 https://gist.github.com/travelhawk/4537a79c11fa5e308e6645a0b434cf4f
 """
 
+
+def proc_write_pipe(proc_pipe, pipe_name, dataInBytes):
+    # # https://stackoverflow.com/questions/67388548/multiple-named-pipes-in-ffmpeg
+    
+    # # Open the pipes as opening files (open for "open for writing only").
+    # # fd_pipe1 is a file descriptor (an integer)
+    # fd_pipe = os.open(pipe_name, os.O_WRONLY)
+    
+    # print(f"fd_pipe: {fd_pipe}")
+
+    # os.write(fd_pipe, dataInBytes)
+    # #os.close(fd_pipe)
+    
+    proc_pipe.stdin.write(dataInBytes)
+    
+
+    pass
+
+
 def stream_youtube():
 
-    pipe = subprocess.Popen(app.command, shell=False, stdin=subprocess.PIPE,
-                            #stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL
-                            )
+    pipeFfmpegProc = subprocess.Popen(app.command, shell=False, stdin=subprocess.PIPE, 
+                                      #stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL
+                                      )
     lastframe = cv2.imread("du.png")
-    
-    lastframe=cv2.resize(lastframe,(app.vidW, app.vidH), cv2.INTER_CUBIC)
+
+    lastframe = cv2.resize(lastframe, (app.vidW, app.vidH), cv2.INTER_CUBIC)
 
     while app.appIsStop == False:
         try:
@@ -165,18 +229,20 @@ def stream_youtube():
 
             if qsize <= 0:
                 frame = lastframe
-            else:                
-                rem = qsize - 24
+            else:
+                rem = qsize - app.fps
                 if rem > 0:
                     print(
-                        f"app.frame/process: {app.framequeue.qsize()} / {app.framequeue_preprocess.qsize()}")
-                    
+                        f"check to remove: app.frame/process: {app.framequeue.qsize()} / {app.framequeue_preprocess.qsize()}")
+
                     for i in range(rem):
                         app.framequeue_preprocess.get()
-                
+
                 frame = app.framequeue_preprocess.get()
-            
-            pipe.stdin.write(frame.tobytes())
+
+            proc_write_pipe(pipeFfmpegProc, app.pipeVid, frame.tobytes())
+            #proc_write_pipe(pipeFfmpegProc, app.pipeAud, streamAud.read(chunk))
+
             lastframe = frame
 
             #cv2.imshow("", frame)
@@ -184,15 +250,16 @@ def stream_youtube():
             time.sleep(app.fps_sleep)  # keep fps
         except Exception as ex:
             print(ex)
+            raise(ex)
             pass
 
-    pipe.terminate()
+    pipeFfmpegProc.terminate()
+
 
 def video_preprocess():
 
     while app.appIsStop == False:
         frame = app.framequeue.get()
-
 
         frame = cv2_draw_contours(frame)
 
@@ -200,6 +267,9 @@ def video_preprocess():
         #                      interpolation=cv2.INTER_AREA)
 
         app.framequeue_preprocess.put(frame)
+
+        # print(
+        #     f"app.frame/process: {app.framequeue.qsize()} / {app.framequeue_preprocess.qsize()}")
 
         time.sleep(0.01)
         pass
@@ -224,7 +294,7 @@ def video_capture():
                 app.framequeue.put(frame)
                 # pipe.communicate(frame.tobytes())
                 # pipe.stdin.write(streamAud.read(chunk))
-                cv2.imshow("123",frame)
+                cv2.imshow("123", frame)
                 cv2.waitKey(1)
         except Exception as ex:
             print(ex)
