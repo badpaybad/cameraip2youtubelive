@@ -306,8 +306,8 @@ def video_capture():
                 # pipe.communicate(frame.tobytes())
                 # pipe.stdin.write(streamAud.read(chunk))
                 
-                # cv2.imshow("123", frame)
-                # cv2.waitKey(1)
+                cv2.imshow("123", frame)
+                cv2.waitKey(1)
                 
         except Exception as ex:
             print(ex)
