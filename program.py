@@ -44,12 +44,12 @@ def cv2_draw_contours(image):
     contours, hierarchy = cv2.findContours(
         edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-    #imagegray= cv2.cvtColor( imagegray, cv2.COLOR_GRAY2BGR)
+    image= cv2.cvtColor( imagegray, cv2.COLOR_GRAY2BGR)
 
-    cv2.drawContours(image, contours, -1, (255, 0, 255), 2)
+    cv2.drawContours(image, contours, -1, (255, 0, 255), 1)
 
     cv2.putText(image, f"Nguyen Phan Du {datetime.datetime.now()}", (10, 50),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
 
     return image
 
@@ -113,33 +113,36 @@ class App:
                         '-y',
                         
                         '-re',
-                        '-f', 'rawvideo',
+                        '-f', 'rawvideo',#fake video input then write image to stdin late
                         '-pixel_format', 'bgr24',
                         '-s', f"{self.vidW}x{self.vidH}",
                         # '-s','320x240',
                         '-framerate', f"{self.fps}",
                         #'-i',   f"{self.pipeVid}",
-                        '-i', '-',
+                        '-i', '-', # write image input  with stdin
 
                         '-f', 'lavfi', 
-                        '-i', 'anullsrc',
+                        '-i', 'anullsrc',# slience sound
+                        
                         # '-stream_loop', '-1',
-                        # '-i', '1.mp3',
-                        # '-f', 'alsa',
+                        # '-i', '1.mp3',#from file
+                        
+                        # '-f', 'alsa',#from mic
                         # '-ac', '2' ,
                         # '-itsoffset', '00:00:00.1',
                         # '-i','default',
+                        
                         # '-re',
                         # '-f', 'lavfi',
-                        # #'-i', f"{self.pipeAud}",
+                        # #'-i', f"{self.pipeAud}",#not working yet, try to write stream from stdin
                         # '-i','-',
 
-                        '-c:v', 'libx264',                        
+                        '-c:v', 'libx264',                        #mp4 format
                         '-vf', 'format=yuv420p,setsar=1:1',
-                        '-force_key_frames', 'expr:gte(t,n_forced*2)',
-                        '-reorder_queue_size','100',
-                        '-max_delay', '500000', #0.5sec
-                        '-pix_fmt', 'yuv420p' ,
+                        '-force_key_frames', 'expr:gte(t,n_forced*2)', # key frame https://support.google.com/youtube/answer/2853702?hl=en#zippy=%2Cp
+                        '-reorder_queue_size','1000',
+                        '-max_delay', '500000', #0.5sec 
+                        '-pix_fmt', 'yuv420p' , #optimize mp4 format
                         #'-vf', 'format=yuv420p,setsar=1:1,scale=-1:720',
                         #'-vf', f'format=yuv420p,setsar=1:1,crop={self.vidCropW}:{self.vidCropH}:0:0',
                         # '-s','320x240',
@@ -158,17 +161,17 @@ class App:
                         '-bufsize', '2048k',  # https://trac.ffmpeg.org/wiki/EncodingForStreamingSites
                         #'-strict', 'experimental',
                         '-strict', '-2',
-                        '-movflags', '+faststart',
+                        '-movflags', '+faststart', #support MAC os quick time to play
                         '-flvflags', 'no_duration_filesize',
                         '-flags', '+global_header',
 
-                        '-f', 'flv', #youtube live ok
-                        rtmp
+                        #'-f', 'flv', #youtube live ok
+                        #rtmp
 
-                    #    '-f', 'mpegts', 
-                    #    "udp://127.0.0.1:7234" # localhost live ok
+                        '-f', 'mpegts', 
+                        "udp://127.0.0.1:7234" # localhost live ok
                     #    #ffplay udp://127.0.0.1:7234
-                    #    #vlc udp://127.0.0.1:7234
+                    #    #vlc udp://@127.0.0.1:7234
                         
                         #"/work/cameraip2youtubelive/program.mp4"
                         ]
@@ -205,7 +208,7 @@ https://gist.github.com/travelhawk/4537a79c11fa5e308e6645a0b434cf4f
 """
 
 
-def proc_write_pipe(proc_pipe, pipe_name, dataInBytes):
+def proc_write_pipe(proc_pipe:subprocess.Popen, pipe_name, dataInBytes):
     # # https://stackoverflow.com/questions/67388548/multiple-named-pipes-in-ffmpeg
     
     # # Open the pipes as opening files (open for "open for writing only").
@@ -218,8 +221,7 @@ def proc_write_pipe(proc_pipe, pipe_name, dataInBytes):
     # #os.close(fd_pipe)
     
     proc_pipe.stdin.write(dataInBytes)
-    
-
+        
     pass
 
 
@@ -303,8 +305,10 @@ def video_capture():
                 app.framequeue.put(frame)
                 # pipe.communicate(frame.tobytes())
                 # pipe.stdin.write(streamAud.read(chunk))
-                cv2.imshow("123", frame)
-                cv2.waitKey(1)
+                
+                # cv2.imshow("123", frame)
+                # cv2.waitKey(1)
+                
         except Exception as ex:
             print(ex)
             pass
