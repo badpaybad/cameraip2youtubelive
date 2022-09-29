@@ -1,7 +1,6 @@
 from distutils.cmd import Command
 from queue import Empty, Queue, LifoQueue
 
-from re import T
 from threading import Thread
 import time
 import cv2
@@ -122,8 +121,10 @@ class App:
                         #'-i',   f"{self.pipeVid}",
                         '-i', '-',
 
-                        '-stream_loop', '-1',
-                        '-i', '1.mp3',
+                        '-f', 'lavfi', 
+                        '-i', 'anullsrc',
+                        # '-stream_loop', '-1',
+                        # '-i', '1.mp3',
                         # '-f', 'alsa',
                         # '-ac', '2' ,
                         # '-itsoffset', '00:00:00.1',
@@ -133,8 +134,12 @@ class App:
                         # #'-i', f"{self.pipeAud}",
                         # '-i','-',
 
-                        '-c:v', 'libx264',
+                        '-c:v', 'libx264',                        
                         '-vf', 'format=yuv420p,setsar=1:1',
+                        '-force_key_frames', 'expr:gte(t,n_forced*2)',
+                        '-reorder_queue_size','100',
+                        '-max_delay', '500000', #0.5sec
+                        '-pix_fmt', 'yuv420p' ,
                         #'-vf', 'format=yuv420p,setsar=1:1,scale=-1:720',
                         #'-vf', f'format=yuv420p,setsar=1:1,crop={self.vidCropW}:{self.vidCropH}:0:0',
                         # '-s','320x240',
@@ -145,33 +150,37 @@ class App:
                         
                         '-c:a', 'aac',
                         '-g', f"{self.fps_g}",
-                        '-b:v', '1984k',
+                        '-b:v', '2048k',#https://support.google.com/youtube/answer/2853702?hl=en#zippy=%2Cp
                         #'-b:a', '96k',
-                        '-r', f"{self.fps}",
+                        '-r', f"{ self.fps}",
                         '-crf', '28',  # https://trac.ffmpeg.org/wiki/Encode/H.264
                         '-maxrate', '960k',
-                        '-bufsize', '1920k',  # https://trac.ffmpeg.org/wiki/EncodingForStreamingSites
+                        '-bufsize', '2048k',  # https://trac.ffmpeg.org/wiki/EncodingForStreamingSites
                         #'-strict', 'experimental',
                         '-strict', '-2',
                         '-movflags', '+faststart',
                         '-flvflags', 'no_duration_filesize',
                         '-flags', '+global_header',
 
-                        # '-f', 'flv',
-                        # rtmp
+                        '-f', 'flv', #youtube live ok
+                        rtmp
 
-                        # '-an',
-                        #"-f" ,"rtp",
-                        # "rtp://127.0.0.1:7234"
-                        # ffplay rtp://127.0.0.1:7234
-
-                        "/work/cameraip2youtubelive/program.mp4"
+                    #    '-f', 'mpegts', 
+                    #    "udp://127.0.0.1:7234" # localhost live ok
+                    #    #ffplay udp://127.0.0.1:7234
+                    #    #vlc udp://127.0.0.1:7234
+                        
+                        #"/work/cameraip2youtubelive/program.mp4"
                         ]
-
+        """
+        https://www.wowza.com/docs/how-to-restream-using-ffmpeg-with-wowza-streaming-engine
+        
+        ffmpeg -f lavfi -i anullare rtsp transport udp - "etap://admin:cam@192.168.7.185:554/cam/realmonitor?channel-16subtype-0 force key frames "expr:gte(t,n_forced 2)" -vf scale-1920:1080 - reorder_queue_size 4000 -max_delay 10000000 -vcodec 11bx264 -b:v 4500k - pix_fmt yuv420p -f fly "cyoutube_stream_url>
+        """
         # capture mic : ffmpeg -f alsa -ac 2 -itsoffset 00:00:00.5 -i default  -f video4linux2 -s 320x240 -r 25 -i /dev/video0 out.mpg
         # xxx=f"ffmpeg -f alsa -ac 2 -itsoffset 00:00:00.5 -i default  -f video4linux2 -s 320x240 -r 25 -i /dev/video0 -c:a aac -c:v libx264 -vf format=yuv420p,setsar=1:1 -movflags +faststart -f flv  rtmp://a.rtmp.youtube.com/live2/keytube"
         # print(xxx)
-        print(self.command)
+        print(' '.join(self.command) )
         pass
     
     def UnlinkPipe(self):       
