@@ -317,7 +317,7 @@ def stream_youtube():
             img= rotate_image(du,angle)
             #(img, alpha_data)= transparent_black(img)
                                     
-            if angle>360:
+            if angle>=360:
                 angle=0
             angle=angle+1
             th,tw,tc= img.shape
