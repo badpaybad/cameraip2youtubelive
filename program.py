@@ -90,7 +90,7 @@ class App:
         self.fps = fps
         self.fps = 24
 
-        self.fps_g = self.fps * 2
+        self.fps_g = self.fps * 5 #https://sites.google.com/site/linuxencoding/x264-ffmpeg-mapping
         self.fps_sleep = (30 / self.fps) * 0.03
         
         self.pipeVid = "pipeVid.mp4"
@@ -140,6 +140,9 @@ class App:
                         '-c:v', 'libx264',                        #mp4 format
                         '-vf', 'format=yuv420p,setsar=1:1',
                         '-force_key_frames', 'expr:gte(t,n_forced*2)', # key frame https://support.google.com/youtube/answer/2853702?hl=en#zippy=%2Cp
+                        '-keyint_min',f"{ self.fps}",
+                        '-x264opts', f"keyint={self.fps_g}:min-keyint={self.fps}:no-scenecut",
+                        '-sc_threshold','40',
                         '-reorder_queue_size','1000',
                         '-max_delay', '500000', #0.5sec 
                         '-pix_fmt', 'yuv420p' , #optimize mp4 format
@@ -176,8 +179,9 @@ class App:
                         #"/work/cameraip2youtubelive/program.mp4"
                         ]
         """
+        ffmpeg option 264 https://sites.google.com/site/linuxencoding/x264-ffmpeg-mapping
         https://www.wowza.com/docs/how-to-restream-using-ffmpeg-with-wowza-streaming-engine
-        
+        https://github.com/Noxalus/Multi-Streaming-Server/blob/master/nginx/conf/nginx.template.conf
         ffmpeg -f lavfi -i anullare rtsp transport udp - "etap://admin:cam@192.168.7.185:554/cam/realmonitor?channel-16subtype-0 force key frames "expr:gte(t,n_forced 2)" -vf scale-1920:1080 - reorder_queue_size 4000 -max_delay 10000000 -vcodec 11bx264 -b:v 4500k - pix_fmt yuv420p -f fly "cyoutube_stream_url>
         """
         # capture mic : ffmpeg -f alsa -ac 2 -itsoffset 00:00:00.5 -i default  -f video4linux2 -s 320x240 -r 25 -i /dev/video0 out.mpg
@@ -302,6 +306,7 @@ def video_capture():
                 success, frame = cap.read()
 
             if success:
+                #frame= cv2.flip(frame,1)
                 app.framequeue.put(frame)
                 # pipe.communicate(frame.tobytes())
                 # pipe.stdin.write(streamAud.read(chunk))
