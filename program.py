@@ -157,6 +157,15 @@ class App:
                         '-async', '1',
                         '-bf', '16',
 
+                        # https://wiki.multimedia.cx/index.php/FFmpeg_Metadata
+                        '-metadata', 'copyright=dunp',
+                        '-metadata', 'author=dunp',
+                        '-metadata', 'album_artist=dunp',
+                        '-metadata', 'album=dunp',
+                        '-metadata', 'comment=dunp',
+                        '-metadata', 'title=dunp',
+                        '-metadata', 'year=2010',
+
                         '-c:a', 'aac',
                         '-g', f"{self.fps_g}",
                         '-b:v', '2048k',  # https://support.google.com/youtube/answer/2853702?hl=en#zippy=%2Cp
