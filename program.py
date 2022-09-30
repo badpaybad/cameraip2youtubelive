@@ -171,8 +171,8 @@ class App:
                         '-flvflags', 'no_duration_filesize',
                         '-flags', '+global_header',
 
-#youtube live ok
-                        # '-f', 'flv', 
+                        # youtube live ok
+                        # '-f', 'flv',
                         # rtmp
 
                         # # convert to .gif work oki                    https://superuser.com/questions/556029/how-do-i-convert-a-video-to-gif-using-ffmpeg-with-reasonable-quality
@@ -184,9 +184,9 @@ class App:
                         # '-loop', '0',
                         # "xxx.gif"
 
-# localhost live ok
-                         '-f', 'mpegts',
-                         "udp://127.0.0.1:7234" 
+                        # localhost live ok
+                        '-f', 'mpegts',
+                        "udp://127.0.0.1:7234"
                         #    #ffplay udp://127.0.0.1:7234
                         #    #vlc udp://@127.0.0.1:7234
 
