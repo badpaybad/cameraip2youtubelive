@@ -44,7 +44,7 @@ def cv2_draw_contours(image):
     contours, hierarchy = cv2.findContours(
         edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-    image= cv2.cvtColor( imagegray, cv2.COLOR_GRAY2BGR)
+    image = cv2.cvtColor(imagegray, cv2.COLOR_GRAY2BGR)
 
     cv2.drawContours(image, contours, -1, (255, 0, 255), 1)
 
@@ -90,14 +90,15 @@ class App:
         self.fps = fps
         self.fps = 24
 
-        self.fps_g = self.fps * 5 #https://sites.google.com/site/linuxencoding/x264-ffmpeg-mapping
+        # https://sites.google.com/site/linuxencoding/x264-ffmpeg-mapping
+        self.fps_g = self.fps * 5
         self.fps_sleep = (30 / self.fps) * 0.03
-        
+
         self.pipeVid = "pipeVid.mp4"
-        self.pipeAud = "pipeAud.mp3"        
-        
+        self.pipeAud = "pipeAud.mp3"
+
         self.UnlinkPipe()
-        
+
         try:
             os.mkfifo(self.pipeVid)
         except:
@@ -111,41 +112,42 @@ class App:
         self.command = ['ffmpeg',
                         '-threads', '0',
                         '-y',
-                        
-                        '-re',
-                        '-f', 'rawvideo',#fake video input then write image to stdin late
+
+                        # '-re',
+                        '-f', 'rawvideo',  # fake video input then write image to stdin late
                         '-pixel_format', 'bgr24',
                         '-s', f"{self.vidW}x{self.vidH}",
                         # '-s','320x240',
                         '-framerate', f"{self.fps}",
                         #'-i',   f"{self.pipeVid}",
-                        '-i', '-', # write image input  with stdin
+                        '-i', '-',  # write image input  with stdin
 
-                        '-f', 'lavfi', 
-                        '-i', 'anullsrc',# slience sound
-                        
+                        '-f', 'lavfi',
+                        '-i', 'anullsrc',  # slience sound
+
                         # '-stream_loop', '-1',
                         # '-i', '1.mp3',#from file
-                        
+
                         # '-f', 'alsa',#from mic
                         # '-ac', '2' ,
                         # '-itsoffset', '00:00:00.1',
                         # '-i','default',
-                        
+
                         # '-re',
                         # '-f', 'lavfi',
                         # #'-i', f"{self.pipeAud}",#not working yet, try to write stream from stdin
                         # '-i','-',
 
-                        '-c:v', 'libx264',                        #mp4 format
+                        '-c:v', 'libx264',  # mp4 format
                         '-vf', 'format=yuv420p,setsar=1:1',
-                        '-force_key_frames', 'expr:gte(t,n_forced*2)', # key frame https://support.google.com/youtube/answer/2853702?hl=en#zippy=%2Cp
-                        '-keyint_min',f"{ self.fps}",
+                        # key frame https://support.google.com/youtube/answer/2853702?hl=en#zippy=%2Cp
+                        '-force_key_frames', 'expr:gte(t,n_forced*2)',
+                        '-keyint_min', f"{ self.fps}",
                         '-x264opts', f"keyint={self.fps_g}:min-keyint={self.fps}:no-scenecut",
-                        '-sc_threshold','40',
-                        '-reorder_queue_size','1000',
-                        '-max_delay', '500000', #0.5sec 
-                        '-pix_fmt', 'yuv420p' , #optimize mp4 format
+                        '-sc_threshold', '40',
+                        '-reorder_queue_size', '1000',
+                        '-max_delay', '500000',  # 0.5sec
+                        '-pix_fmt', 'yuv420p',  # optimize mp4 format
                         #'-vf', 'format=yuv420p,setsar=1:1,scale=-1:720',
                         #'-vf', f'format=yuv420p,setsar=1:1,crop={self.vidCropW}:{self.vidCropH}:0:0',
                         # '-s','320x240',
@@ -153,11 +155,11 @@ class App:
                         '-vprofile', 'baseline',
                         '-preset', 'veryfast',
                         '-async', '1',
-                        '-bf','16',
-                        
+                        '-bf', '16',
+
                         '-c:a', 'aac',
                         '-g', f"{self.fps_g}",
-                        '-b:v', '2048k',#https://support.google.com/youtube/answer/2853702?hl=en#zippy=%2Cp
+                        '-b:v', '2048k',  # https://support.google.com/youtube/answer/2853702?hl=en#zippy=%2Cp
                         #'-b:a', '96k',
                         '-r', f"{ self.fps}",
                         '-crf', '28',  # https://trac.ffmpeg.org/wiki/Encode/H.264
@@ -165,19 +167,30 @@ class App:
                         '-bufsize', '2048k',  # https://trac.ffmpeg.org/wiki/EncodingForStreamingSites
                         #'-strict', 'experimental',
                         '-strict', '-2',
-                        '-movflags', '+faststart', #support MAC os quick time to play
+                        '-movflags', '+faststart',  # support MAC os quick time to play
                         '-flvflags', 'no_duration_filesize',
                         '-flags', '+global_header',
 
-                        #'-f', 'flv', #youtube live ok
-                        #rtmp
+#youtube live ok
+                        # '-f', 'flv', 
+                        # rtmp
 
-                        '-f', 'mpegts', 
-                        "udp://127.0.0.1:7234" # localhost live ok
-                    #    #ffplay udp://127.0.0.1:7234
-                    #    #vlc udp://@127.0.0.1:7234
-                        
-                        #"/work/cameraip2youtubelive/program.mp4"
+                        # # convert to .gif work oki                    https://superuser.com/questions/556029/how-do-i-convert-a-video-to-gif-using-ffmpeg-with-reasonable-quality
+                        # '-an',
+                        # ##'-vf', "scale=320:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse",
+                        # '-f', 'image2pipe',
+                        # 'convert ',
+                        # '-delay', '10',
+                        # '-loop', '0',
+                        # "xxx.gif"
+
+# localhost live ok
+                         '-f', 'mpegts',
+                         "udp://127.0.0.1:7234" 
+                        #    #ffplay udp://127.0.0.1:7234
+                        #    #vlc udp://@127.0.0.1:7234
+
+                        # "/work/cameraip2youtubelive/program.mp4"
                         ]
         """
         ffmpeg option 264 https://sites.google.com/site/linuxencoding/x264-ffmpeg-mapping
@@ -188,11 +201,11 @@ class App:
         # capture mic : ffmpeg -f alsa -ac 2 -itsoffset 00:00:00.5 -i default  -f video4linux2 -s 320x240 -r 25 -i /dev/video0 out.mpg
         # xxx=f"ffmpeg -f alsa -ac 2 -itsoffset 00:00:00.5 -i default  -f video4linux2 -s 320x240 -r 25 -i /dev/video0 -c:a aac -c:v libx264 -vf format=yuv420p,setsar=1:1 -movflags +faststart -f flv  rtmp://a.rtmp.youtube.com/live2/keytube"
         # print(xxx)
-        print(' '.join(self.command) )
+        print(' '.join(self.command))
         pass
-    
-    def UnlinkPipe(self):       
-        
+
+    def UnlinkPipe(self):
+
         try:
             os.unlink(self.pipeVid)
         except:
@@ -201,9 +214,10 @@ class App:
             os.unlink(self.pipeAud)
         except:
             pass
-       
+
     def __del__(self):
         self.UnlinkPipe()
+
 
 app = App()
 
@@ -213,26 +227,26 @@ https://gist.github.com/travelhawk/4537a79c11fa5e308e6645a0b434cf4f
 """
 
 
-def proc_write_pipe(proc_pipe:subprocess.Popen, pipe_name, dataInBytes):
+def proc_write_pipe(proc_pipe: subprocess.Popen, pipe_name, dataInBytes):
     # # https://stackoverflow.com/questions/67388548/multiple-named-pipes-in-ffmpeg
-    
+
     # # Open the pipes as opening files (open for "open for writing only").
     # # fd_pipe1 is a file descriptor (an integer)
     # fd_pipe = os.open(pipe_name, os.O_WRONLY)
-    
+
     # print(f"fd_pipe: {fd_pipe}")
 
     # os.write(fd_pipe, dataInBytes)
     # #os.close(fd_pipe)
-    
+
     proc_pipe.stdin.write(dataInBytes)
-        
+
     pass
 
 
 def stream_youtube():
 
-    pipeFfmpegProc = subprocess.Popen(app.command, shell=False, stdin=subprocess.PIPE, 
+    pipeFfmpegProc = subprocess.Popen(app.command, shell=False, stdin=subprocess.PIPE,
                                       #stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL
                                       )
     lastframe = cv2.imread("du.png")
@@ -311,10 +325,10 @@ def video_capture():
                 app.framequeue.put(frame)
                 # pipe.communicate(frame.tobytes())
                 # pipe.stdin.write(streamAud.read(chunk))
-                
+
                 cv2.imshow("123", frame)
                 cv2.waitKey(1)
-                
+
         except Exception as ex:
             print(ex)
             pass
