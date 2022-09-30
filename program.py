@@ -153,6 +153,7 @@ class App:
                         '-vprofile', 'baseline',
                         '-preset', 'veryfast',
                         '-async', '1',
+                        '-bf','16',
                         
                         '-c:a', 'aac',
                         '-g', f"{self.fps_g}",
