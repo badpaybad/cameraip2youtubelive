@@ -104,16 +104,18 @@ class App:
                         #'-i',   f"{self.pipeVid}",
                         '-i', '-',  # write image input  with stdin
 
-                        '-f', 'lavfi',
-                        '-i', 'anullsrc',  # slience sound
+                        # # slience sound
+                        # '-f', 'lavfi',
+                        # '-i', 'anullsrc',  
 
                         # '-stream_loop', '-1',
                         # '-i', '1.mp3',#from file
 
-                        # '-f', 'alsa',#from mic
-                        # '-ac', '2' ,
-                        # '-itsoffset', '00:00:00.1',
-                        # '-i','default',
+                        ##from mic
+                         '-f', 'alsa',
+                         '-ac', '2' ,
+                         '-itsoffset', '00:00:00.1',
+                         '-i','default',
 
                         # '-re',
                         # '-f', 'lavfi',
@@ -163,8 +165,8 @@ class App:
                         '-flags', '+global_header',
 
                         # youtube live ok
-                        # '-f', 'flv',
-                        # rtmp
+                        '-f', 'flv',
+                        rtmp
 
                         # # convert to .gif work oki                    https://superuser.com/questions/556029/how-do-i-convert-a-video-to-gif-using-ffmpeg-with-reasonable-quality
                         # '-an',
@@ -175,11 +177,11 @@ class App:
                         # '-loop', '0',
                         # "xxx.gif"
 
-                        # localhost live ok
-                        '-f', 'mpegts',
-                        "udp://127.0.0.1:7234"
-                        #    #ffplay udp://127.0.0.1:7234
-                        #    #vlc udp://@127.0.0.1:7234
+                        # # localhost live ok
+                        # '-f', 'mpegts',
+                        # "udp://127.0.0.1:7234"
+                        # #    #ffplay udp://127.0.0.1:7234
+                        # #    #vlc udp://@127.0.0.1:7234
 
                         # "/work/cameraip2youtubelive/program.mp4"
                         ]
