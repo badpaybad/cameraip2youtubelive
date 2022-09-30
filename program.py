@@ -8,6 +8,7 @@ import subprocess
 import pyaudio
 import datetime
 import os
+import numpy
 
 
 def audio_stream():
@@ -39,7 +40,7 @@ def cv2_draw_contours(image):
     thresh, imagegray = cv2.threshold(
         imagegray, 70, 255, cv2.THRESH_BINARY_INV)
 
-    edges = cv2.Canny(imagegray, 100, 200)
+    edges = cv2.Canny(imagegray, 100, 155)
 
     contours, hierarchy = cv2.findContours(
         edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -70,8 +71,7 @@ fps = int(cap.get(cv2.CAP_PROP_FPS))
 # width=480
 # height=320
 
-print(width, height, fps)
-
+print("camera info:w:h:fps:", width, height, fps)
 
 class App:
     def __init__(self):
@@ -108,7 +108,7 @@ class App:
         except:
             pass
 
-        print(self.vidW, self.vidH)
+        print("display:w:h:" ,self.vidW, self.vidH)
         self.command = ['ffmpeg',
                         '-threads', '0',
                         '-y',
@@ -252,6 +252,34 @@ def proc_write_pipe(proc_pipe: subprocess.Popen, pipe_name, dataInBytes):
 
     pass
 
+def transparent_black(src):
+    # Convert image to image gray
+    tmp = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)
+    
+    # Applying thresholding technique
+    _, alpha = cv2.threshold(tmp, 0, 255, cv2.THRESH_BINARY)
+    
+    # Using cv2.split() to split channels 
+    # of coloured image
+    b, g, r = cv2.split(src)
+    
+    # Making list of Red, Green, Blue
+    # Channels and alpha
+    rgba = [b, g, r, alpha]
+    
+    # Using cv2.merge() to merge rgba
+    # into a coloured/multi-channeled image
+    dst = cv2.merge(rgba, 4)
+    return (dst, alpha)
+
+def rotate_image(image, angle):
+    try:
+        image_center = tuple(numpy.array(image.shape[1::-1]) / 2)
+        rot_mat = cv2.getRotationMatrix2D(image_center, angle, 1.0)
+        result = cv2.warpAffine(image, rot_mat, image.shape[1::-1], flags=cv2.INTER_LINEAR)
+        return result
+    except:
+        return image
 
 def stream_youtube():
 
@@ -261,7 +289,14 @@ def stream_youtube():
     lastframe = cv2.imread("du.png")
 
     lastframe = cv2.resize(lastframe, (app.vidW, app.vidH), cv2.INTER_CUBIC)
-
+    
+    du=cv2.imread("du.png")
+    du=cv2.resize(du,(120,120))
+    print("du.png", du.shape)
+    
+    x=app.vidW-130        
+    y=10
+    angle=1
     while app.appIsStop == False:
         try:
             qsize = app.framequeue_preprocess.qsize()
@@ -278,7 +313,25 @@ def stream_youtube():
                         app.framequeue_preprocess.get()
 
                 frame = app.framequeue_preprocess.get()
-
+                
+            img= rotate_image(du,angle)
+            #(img, alpha_data)= transparent_black(img)
+                                    
+            if angle>360:
+                angle=0
+            angle=angle+1
+            th,tw,tc= img.shape
+            
+            #frame=cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
+            #print("x:tw+x",x,tw+x)
+            
+            frame[y:th+y,x:tw+x,:]= img[0:tw,0:th,:]            
+            
+            #cv2.imshow("",frame)
+            #cv2.waitKey(1)
+            
+            #frame=cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+            
             proc_write_pipe(pipeFfmpegProc, app.pipeVid, frame.tobytes())
             #proc_write_pipe(pipeFfmpegProc, app.pipeAud, streamAud.read(chunk))
 
@@ -304,7 +357,7 @@ def video_preprocess():
 
         # frame = cv2.resize(frame, (app.vidH, app.vidH),
         #                      interpolation=cv2.INTER_AREA)
-
+        
         app.framequeue_preprocess.put(frame)
 
         # print(
@@ -331,12 +384,13 @@ def video_capture():
 
             if success:
                 #frame= cv2.flip(frame,1)
+                                
                 app.framequeue.put(frame)
                 # pipe.communicate(frame.tobytes())
                 # pipe.stdin.write(streamAud.read(chunk))
 
-                cv2.imshow("123", frame)
-                cv2.waitKey(1)
+                #cv2.imshow("123", frame)
+                #cv2.waitKey(1)
 
         except Exception as ex:
             print(ex)
