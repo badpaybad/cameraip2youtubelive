@@ -179,13 +179,13 @@ class App:
                         # "xxx.gif"
 
                         # # localhost live ok
-                        '-f', 'mpegts',
-                        "udp://127.0.0.1:7234"
+                        #'-f', 'mpegts',
+                        #"udp://127.0.0.1:7234"
                         # #    #ffplay udp://127.0.0.1:7234
                         # #    #vlc udp://@127.0.0.1:7234
 
                         # #save to file
-                        #"/work/cameraip2youtubelive/program.mp4"
+                        "/work/cameraip2youtubelive/program.mp4"
                         ]
         """
         ffmpeg option 264 https://sites.google.com/site/linuxencoding/x264-ffmpeg-mapping
@@ -384,8 +384,9 @@ def video_preprocess_zoom(frameW,frameH, zoomQueue: Queue):
     du = cv2.resize(du, (120, 126), cv2.INTER_LINEAR)    
     tw=120
     th=126
-    ts=2
+    ts=10
     td=-1
+    mw=10
     while app.appIsStop == False:
         if zoomQueue.qsize()>1000:
             time.sleep(1)
@@ -399,9 +400,11 @@ def video_preprocess_zoom(frameW,frameH, zoomQueue: Queue):
         tw=tw+td*ts
         th=th+td*ts
         
+        mw=mw-td*20
+        
         img= cv2.resize(du,(tw,th), cv2.INTER_LINEAR)
                 
-        zoomQueue.put((img, 50,10))
+        zoomQueue.put((img, 40,mw))
         pass
 
 def video_preprocess_rotate(frameW,frameH, rotateQueue: Queue):
