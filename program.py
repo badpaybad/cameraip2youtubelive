@@ -179,13 +179,13 @@ class App:
                         # "xxx.gif"
 
                         # # localhost live ok
-                        #'-f', 'mpegts',
-                        #"udp://127.0.0.1:7234"
+                        '-f', 'mpegts',
+                        "udp://127.0.0.1:7234"
                         # #    #ffplay udp://127.0.0.1:7234
                         # #    #vlc udp://@127.0.0.1:7234
 
                         # #save to file
-                        "/work/cameraip2youtubelive/program.mp4"
+                        #"/work/cameraip2youtubelive/program.mp4"
                         ]
         """
         ffmpeg option 264 https://sites.google.com/site/linuxencoding/x264-ffmpeg-mapping
@@ -387,6 +387,7 @@ def video_preprocess_zoom(frameW,frameH, zoomQueue: Queue):
     ts=10
     td=-1
     mw=10
+    mh=40
     while app.appIsStop == False:
         if zoomQueue.qsize()>1000:
             time.sleep(1)
@@ -400,11 +401,11 @@ def video_preprocess_zoom(frameW,frameH, zoomQueue: Queue):
         tw=tw+td*ts
         th=th+td*ts
         
-        mw=mw-td*20
-        
+        mw=mw-td*5
+        mh=mh-td*5
         img= cv2.resize(du,(tw,th), cv2.INTER_LINEAR)
                 
-        zoomQueue.put((img, 40,mw))
+        zoomQueue.put((img, mh,mw))
         pass
 
 def video_preprocess_rotate(frameW,frameH, rotateQueue: Queue):
@@ -490,7 +491,7 @@ def video_capture():
                 app.appIsStop = True
                 break
 
-            for i in range(5):
+            for i in range(3):
                 success, frame = cap.read()
 
             if success:
@@ -503,6 +504,7 @@ def video_capture():
                 #cv2.imshow("123", frame)
                 # cv2.waitKey(1)
 
+            time.sleep(app.fps_sleep)  # keep fps
         except Exception as ex:
             print(ex)
             pass
