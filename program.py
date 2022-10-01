@@ -185,7 +185,7 @@ class App:
                         # #    #vlc udp://@127.0.0.1:7234
 
                         # #save to file
-                        # "/work/cameraip2youtubelive/program.mp4"
+                        #"/work/cameraip2youtubelive/program.mp4"
                         ]
         """
         ffmpeg option 264 https://sites.google.com/site/linuxencoding/x264-ffmpeg-mapping
@@ -379,6 +379,31 @@ def stream_youtube():
     pipeFfmpegProc.terminate()
 
 
+def video_preprocess_zoom(frameW,frameH, zoomQueue: Queue):
+    du = cv2.imread("du.png")
+    du = cv2.resize(du, (120, 126), cv2.INTER_LINEAR)    
+    tw=120
+    th=126
+    ts=2
+    td=-1
+    while app.appIsStop == False:
+        if zoomQueue.qsize()>1000:
+            time.sleep(1)
+            continue
+        
+        if tw>=120:
+            td=-1
+        if tw<=10:
+            td=1
+            
+        tw=tw+td*ts
+        th=th+td*ts
+        
+        img= cv2.resize(du,(tw,th), cv2.INTER_LINEAR)
+                
+        zoomQueue.put((img, 50,10))
+        pass
+
 def video_preprocess_rotate(frameW,frameH, rotateQueue: Queue):
 
     du = cv2.imread("du.png")
@@ -394,7 +419,7 @@ def video_preprocess_rotate(frameW,frameH, rotateQueue: Queue):
 
         if angle >= 360:
             angle = 0
-        angle = angle+5
+        angle = angle+1
         
         rotateQueue.put((img, 0,frameW- wi))
 
@@ -403,25 +428,36 @@ def video_preprocess_rotate(frameW,frameH, rotateQueue: Queue):
 
 def video_preprocess():
 
+
+    zoomQueue = Queue()
     rotateQueue = Queue()
 
     trotate = Thread(target=video_preprocess_rotate,
                      args=(app.vidW,app.vidH, rotateQueue,), daemon=True)
     trotate.start()
     
+    
+    tzoom = Thread(target=video_preprocess_zoom,
+                     args=(app.vidW,app.vidH, zoomQueue,), daemon=True)
+    tzoom.start()
+    
     while app.appIsStop == False:
         frame = app.framequeue.get()
 
         frame = cv2_draw_contours(frame)
-
-        # frame = cv2.resize(frame, (app.vidH, app.vidH),
-        #                      interpolation=cv2.INTER_AREA)
+        
         try:
-            (img, hi, wi) = rotateQueue.get()
-            draw_overlay(frame, img, wi, hi, (0, 0, 0))
+            (imgr, hir, wir) = rotateQueue.get()
+            draw_overlay(frame, imgr, wir, hir, (0, 0, 0))
         except:
             pass
-
+        
+        try:
+            (imgz, hiz, wiz) = zoomQueue.get()
+            draw_overlay(frame, imgz, wiz, hiz, None)
+        except:
+            pass
+        
         #frame=cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
         #frame=cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
         tnow = datetime.datetime.now()
