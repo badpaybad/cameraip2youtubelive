@@ -105,17 +105,18 @@ class App:
                         '-i', '-',  # write image input  with stdin
 
                         # # slience sound
-                        # '-f', 'lavfi',
-                        # '-i', 'anullsrc',  
+                        '-f', 'lavfi',
+                        '-i', 'anullsrc',
 
+                        # sound from file
                         # '-stream_loop', '-1',
                         # '-i', '1.mp3',#from file
 
-                        ##from mic
-                         '-f', 'alsa',
-                         '-ac', '2' ,
-                         '-itsoffset', '00:00:00.1',
-                         '-i','default',
+                        # from mic
+                        #  '-f', 'alsa',
+                        #  '-ac', '2' ,
+                        #  '-itsoffset', '00:00:00.1',
+                        #  '-i','default',
 
                         # '-re',
                         # '-f', 'lavfi',
@@ -165,8 +166,8 @@ class App:
                         '-flags', '+global_header',
 
                         # youtube live ok
-                        '-f', 'flv',
-                        rtmp
+                        #'-f', 'flv',
+                        # rtmp
 
                         # # convert to .gif work oki                    https://superuser.com/questions/556029/how-do-i-convert-a-video-to-gif-using-ffmpeg-with-reasonable-quality
                         # '-an',
@@ -178,11 +179,12 @@ class App:
                         # "xxx.gif"
 
                         # # localhost live ok
-                        # '-f', 'mpegts',
-                        # "udp://127.0.0.1:7234"
+                        '-f', 'mpegts',
+                        "udp://127.0.0.1:7234"
                         # #    #ffplay udp://127.0.0.1:7234
                         # #    #vlc udp://@127.0.0.1:7234
 
+                        # #save to file
                         # "/work/cameraip2youtubelive/program.mp4"
                         ]
         """
@@ -315,7 +317,7 @@ def rotate_image(image, angle):
     #image = imutils.rotate_bound(image, angle)
     # return image
     h, w, c = image.shape
-    r = int(sqrt(h*h+w*w))+2  
+    r = int(sqrt(h*h+w*w))+2
     nx = int((r-w)/2)
     ny = int((r-h)/2)
 
@@ -323,16 +325,16 @@ def rotate_image(image, angle):
     # blank[:,:]=(69,255,0)#green in film
     blank[ny:ny+h, nx:nx+w] = image
     image = blank
-    
+
     try:
         image_center = tuple(numpy.array(image.shape[1::-1]) / 2)
 
         rot_mat = cv2.getRotationMatrix2D(image_center, -angle, 1.0)
         result = cv2.warpAffine(
             image, rot_mat, image.shape[1::-1], flags=cv2.INTER_LINEAR)
-        return (result,r,r)
+        return (result, r, r)
     except:
-        return (image,h,w)
+        return (image, h, w)
 
 
 def stream_youtube():
@@ -377,15 +379,36 @@ def stream_youtube():
     pipeFfmpegProc.terminate()
 
 
-def video_preprocess():
+def video_preprocess_rotate(frameW,frameH, rotateQueue: Queue):
 
     du = cv2.imread("du.png")
-    du = cv2.resize(du, (120, 120))
+    du = cv2.resize(du, (120, 126))
     print("du.png", du.shape)
-
-    
-    y = int(app.vidH/2)
     angle = 1
+    while app.appIsStop == False:
+        if rotateQueue.qsize()>1000:
+            time.sleep(1)
+            continue
+        (img, hi, wi) = rotate_image(du, angle)
+        #(img, alpha_data)= transparent_black(img)
+
+        if angle >= 360:
+            angle = 0
+        angle = angle+5
+        
+        rotateQueue.put((img, 0,frameW- wi))
+
+        pass
+
+
+def video_preprocess():
+
+    rotateQueue = Queue()
+
+    trotate = Thread(target=video_preprocess_rotate,
+                     args=(app.vidW,app.vidH, rotateQueue,), daemon=True)
+    trotate.start()
+    
     while app.appIsStop == False:
         frame = app.framequeue.get()
 
@@ -393,24 +416,20 @@ def video_preprocess():
 
         # frame = cv2.resize(frame, (app.vidH, app.vidH),
         #                      interpolation=cv2.INTER_AREA)
-
-        (img,hi,wi) = rotate_image(du, angle)
-        #(img, alpha_data)= transparent_black(img)
-
-        if angle >= 360:
-            angle = 0
-        angle = angle+5
-
-        draw_overlay(frame, img, app.vidW-wi, 0, (0,0,0))
+        try:
+            (img, hi, wi) = rotateQueue.get()
+            draw_overlay(frame, img, wi, hi, (0, 0, 0))
+        except:
+            pass
 
         #frame=cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
         #frame=cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
-        tnow= datetime.datetime.now()
+        tnow = datetime.datetime.now()
         cv2.putText(frame, f"Nguyen Phan Du {tnow}", (10, 20),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
         cv2.putText(frame, f"Nguyen Phan Du {tnow}", (11, 21),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (69, 255, 0), 1)
-        
+
         app.framequeue_preprocess.put(frame)
 
         # print(
