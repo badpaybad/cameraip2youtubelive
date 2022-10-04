@@ -93,8 +93,8 @@ class App:
         print("display:w:h:", self.vidW, self.vidH)
         self.command = ['ffmpeg',
                         '-threads', '0',
-                        '-y',
-                        
+                        '-thread_queue_size','4096',
+                        '-y',                        
                          '-re',
                         '-f', 'rawvideo',  # fake video input then write image to stdin late
                         '-pixel_format', 'bgr24',
@@ -126,16 +126,19 @@ class App:
                         # '-f', 'lavfi',
                         # #'-i', f"{self.pipeAud}",#not working yet, try to write stream from stdin
                         # '-i','-',
-
+                        
                         '-c:v', 'libx264',  # mp4 format
-                        '-vf', 'format=yuv420p,setsar=1:1',
+                        '-vf', 'yadif,format=yuv420p,setsar=1:1',
                         # key frame https://support.google.com/youtube/answer/2853702?hl=en#zippy=%2Cp
-                        '-force_key_frames', 'expr:gte(t,n_forced*1)',
-                        #-force_key_frames expr:'gte(t,n_forced*2)'
+                        
+                        '-force_key_frames', 'expr:gte(t,n_forced/2)',
+                        
+                       # '-force_key_frames', 'expr:gte(t,n_forced*2)'
+                        
                         '-keyint_min', f"{ self.fps}",
                         '-x264opts', f"keyint={self.fps_g}:min-keyint={self.fps}:no-scenecut",
                         '-sc_threshold', '40',
-                        '-reorder_queue_size', '1000',
+                        '-reorder_queue_size', '4096',
                         '-max_delay', '500000',  # 0.5sec
                         '-pix_fmt', 'yuv420p',  # optimize mp4 format
                         #'-vf', 'format=yuv420p,setsar=1:1,scale=-1:720',
@@ -145,8 +148,8 @@ class App:
                         '-vprofile', 'baseline',                        
                         '-preset', 'veryfast',
                         '-async', '1',
-                        '-bf', '16',
-
+                        '-bf', '2',
+                        '-use_editlist', '0',
                         # https://wiki.multimedia.cx/index.php/FFmpeg_Metadata
                         '-metadata', 'copyright=dunp',
                         '-metadata', 'author=dunp',
@@ -190,8 +193,8 @@ class App:
                         # "xxx.gif"
 
                         # # localhost live ok
-                        #'-f', 'mpegts',
-                        #"udp://127.0.0.1:7234"
+                        '-f', 'mpegts',
+                        "udp://127.0.0.1:7234"
                         # #    #ffplay udp://127.0.0.1:7234
                         # #    #vlc udp://@127.0.0.1:7234
                         
