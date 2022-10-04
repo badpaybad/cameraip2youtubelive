@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Your title</title>
+
+    <link href="/m3u8stream/video-js.css" rel="stylesheet" />
+    <script src="/m3u8stream/video.js"></script>
+    <script src="/m3u8stream/videojs-contrib-hls.js"></script>
+    <style>
+      .vid {
+      }
+    </style>
+  </head>
+  <body>
+    <div style="width: 640px">
+      <video
+        id="my_video_1"
+        autoplay="true"
+        class="video-js vjs-fluid vjs-default-skin"
+        controls
+        preload="auto"
+        data-setup="{}"
+      >
+        <source
+          src="http://localhost/stream.m3u8"
+          type="application/vnd.apple.mpegurl"
+        />
+      </video>
+    </div>
+    <script>
+      try {
+        var player = videojs("my_video_1");
+        player.play();
+      } catch {
+        let videoElem = document.getElementById("my_video_1");
+        videoElem.play();
+      }
+    </script>
+  </body>
+</html>

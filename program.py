@@ -94,25 +94,29 @@ class App:
         self.command = ['ffmpeg',
                         '-threads', '0',
                         '-y',
-
-                        # '-re',
+                        
+                         '-re',
                         '-f', 'rawvideo',  # fake video input then write image to stdin late
                         '-pixel_format', 'bgr24',
                         '-s', f"{self.vidW}x{self.vidH}",
                         # '-s','320x240',
                         '-framerate', f"{self.fps}",
                         #'-i',   f"{self.pipeVid}",
+                        '-hwaccel','auto',
                         '-i', '-',  # write image input  with stdin
 
                         # # slience sound
+                        '-re',
                         '-f', 'lavfi',
                         '-i', 'anullsrc',
 
                         # sound from file
+                        #'-re',
                         # '-stream_loop', '-1',
                         # '-i', '1.mp3',#from file
 
                         # from mic
+                        #'-re',
                         #  '-f', 'alsa',
                         #  '-ac', '2' ,
                         #  '-itsoffset', '00:00:00.1',
@@ -126,7 +130,8 @@ class App:
                         '-c:v', 'libx264',  # mp4 format
                         '-vf', 'format=yuv420p,setsar=1:1',
                         # key frame https://support.google.com/youtube/answer/2853702?hl=en#zippy=%2Cp
-                        '-force_key_frames', 'expr:gte(t,n_forced*2)',
+                        '-force_key_frames', 'expr:gte(t,n_forced*1)',
+                        #-force_key_frames expr:'gte(t,n_forced*2)'
                         '-keyint_min', f"{ self.fps}",
                         '-x264opts', f"keyint={self.fps_g}:min-keyint={self.fps}:no-scenecut",
                         '-sc_threshold', '40',
@@ -137,7 +142,7 @@ class App:
                         #'-vf', f'format=yuv420p,setsar=1:1,crop={self.vidCropW}:{self.vidCropH}:0:0',
                         # '-s','320x240',
                         '-tune', 'zerolatency',
-                        '-vprofile', 'baseline',
+                        '-vprofile', 'baseline',                        
                         '-preset', 'veryfast',
                         '-async', '1',
                         '-bf', '16',
@@ -164,7 +169,11 @@ class App:
                         '-movflags', '+faststart',  # support MAC os quick time to play
                         '-flvflags', 'no_duration_filesize',                        
                         '-flags', '+global_header',
-                        '-fflags','nobuffer',
+                        "-x264opts","opencl",
+                        
+                        #'-fflags','nobuffer',
+                        #'-probesize','32',
+                        #'-analyzeduration','0',
                         
 
                         # youtube live ok
@@ -181,10 +190,17 @@ class App:
                         # "xxx.gif"
 
                         # # localhost live ok
-                        '-f', 'mpegts',
-                        "udp://127.0.0.1:7234"
+                        #'-f', 'mpegts',
+                        #"udp://127.0.0.1:7234"
                         # #    #ffplay udp://127.0.0.1:7234
                         # #    #vlc udp://@127.0.0.1:7234
+                        
+                        ## stream through http m3u8stream/index.html
+                        # '-f','hls',
+                        # '-hls_time','10',
+                        # '-segment_time','10',
+                        # '-hls_list_size','10',
+                        # '/m3u8stream/stream.m3u8'
 
                         # #save to file
                         #"/work/cameraip2youtubelive/program.mp4"
@@ -531,3 +547,4 @@ tyoutube.start()
 tvid.join()
 
 # https://stackoverflow.com/questions/68527762/pipe-opencv-and-pyaudio-to-ffmpeg-streaming-youtube-rtmp-from-python
+#https://sonnati.wordpress.com/2011/08/30/ffmpeg-%e2%80%93-the-swiss-army-knife-of-internet-streaming-%e2%80%93-part-iv/
