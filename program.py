@@ -174,11 +174,13 @@ class App:
                         '-crf', '28',  # https://trac.ffmpeg.org/wiki/Encode/H.264
                         '-maxrate', '960k',
                         '-bufsize', '2048k',  # https://trac.ffmpeg.org/wiki/EncodingForStreamingSites
-                        #'-strict', 'experimental',
-                        '-strict', '-2',
+                        '-strict', 'experimental',
+                        #'-strict', '-2',
                         '-movflags', '+faststart',  # support MAC os quick time to play
-                        '-flvflags', 'no_duration_filesize',
+                        '-flvflags', 'no_duration_filesize',                        
                         '-flags', '+global_header',
+                        '-fflags','nobuffer',
+                        
 
                         # youtube live ok
                         # '-f', 'flv',
