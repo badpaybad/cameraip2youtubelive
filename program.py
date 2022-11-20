@@ -1,3 +1,7 @@
+from signal import signal, SIGPIPE, SIG_DFL
+
+signal(SIGPIPE,SIG_DFL)
+
 from distutils.cmd import Command
 from math import sqrt
 from queue import Empty, Queue, LifoQueue
@@ -11,6 +15,8 @@ import datetime
 import os
 import numpy
 import imutils
+
+import multiprocessing
 
 
 def audio_stream():
@@ -36,40 +42,37 @@ def audio_stream():
     return (stream, p, CHUNK)
 
 
-rtmp = f'rtmp://a.rtmp.youtube.com/live2/xxx'
-
 cameraip = 0
 # cameraip="rtsp://..."
 
 (streamAud, pAud, chunk) = audio_stream()
 
-cap = cv2.VideoCapture(cameraip)
 
-width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-fps = int(cap.get(cv2.CAP_PROP_FPS))
+sharedCameraQueueCaptured= multiprocessing.Queue()
 
-# width=480
-# height=320
+shared_framequeue_preprocess= multiprocessing.Queue()
 
-print("camera info:w:h:fps:", width, height, fps)
+sharedIsStoped= multiprocessing.Value("i",0)
+sharedVidWidth=multiprocessing.Value("i",640)
+sharedVidHeight=multiprocessing.Value("i",480)
+sharedVidFps=multiprocessing.Value("i",24)
+sharedVidFps_g = multiprocessing.Value("i",int(sharedVidFps.value * 5))
+sharedVidFps_sleep =multiprocessing.Value("d", (30 / sharedVidFps.value) * 0.03)
 
 
 class App:
-    def __init__(self):
+    def __init__(self,vid_width,vid_height,vid_fps):
         self.appIsStop = False
-        self.framequeue = Queue()
-        self.framequeue_preprocess = Queue()
-
+        
         # self.vidH=width
         # self.vidH=int(720*2)
         # self.vidW= int(int(self.vidH*width)/height)
         # self.vidCropH= int(self.vidH/4)
         # self.vidCropW= int(self.vidW/4)
 
-        self.vidH = height
-        self.vidW = width
-        self.fps = fps
+        self.vidH = vid_height
+        self.vidW = vid_width
+        self.fps = vid_fps
         self.fps = 24
 
         # https://sites.google.com/site/linuxencoding/x264-ffmpeg-mapping
@@ -102,13 +105,13 @@ class App:
                         # '-s','320x240',
                         '-framerate', f"{self.fps}",
                         #'-i',   f"{self.pipeVid}",
-                        '-hwaccel','auto',
+                        #'-hwaccel','auto',
                         '-i', '-',  # write image input  with stdin
 
                         # # slience sound
-                        '-re',
-                        '-f', 'lavfi',
-                        '-i', 'anullsrc',
+                        #'-re',
+                        #'-f', 'lavfi',
+                        #'-i', 'anullsrc',
 
                         # sound from file
                         #'-re',
@@ -116,11 +119,11 @@ class App:
                         # '-i', '1.mp3',#from file
 
                         # from mic
-                        #'-re',
-                        #  '-f', 'alsa',
-                        #  '-ac', '2' ,
-                        #  '-itsoffset', '00:00:00.1',
-                        #  '-i','default',
+                        '-re',
+                          '-f', 'alsa',
+                          '-ac', '2' ,
+                          '-itsoffset', '00:00:00.1',
+                          '-i','default',
 
                         # '-re',
                         # '-f', 'lavfi',
@@ -179,9 +182,9 @@ class App:
                         #'-analyzeduration','0',
                         
 
-                        # youtube live ok
+                        ## youtube live ok
                         #'-f', 'flv',
-                        # rtmp
+                         #rtmp
 
                         # # convert to .gif work oki                    https://superuser.com/questions/556029/how-do-i-convert-a-video-to-gif-using-ffmpeg-with-reasonable-quality
                         # '-an',
@@ -235,7 +238,6 @@ class App:
         self.UnlinkPipe()
 
 
-app = App()
 
 # https://trac.ffmpeg.org/wiki/StreamingGuide
 """
@@ -247,7 +249,7 @@ def cv2_draw_contours(image):
     imagegray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)  # gray scale image
     #image = cv2.cvtColor(image, cv2.COLOR_BGR2LUV)
     thresh, imagegray = cv2.threshold(
-        imagegray, 70, 255, cv2.THRESH_BINARY)
+        imagegray, 70, 255, cv2.THRESH_BINARY_INV)
 
     edges = cv2.Canny(imagegray, 100, 155)
 
@@ -359,42 +361,191 @@ def rotate_image(image, angle):
 
 
 def stream_youtube():
+    
+    
+    command = ['ffmpeg',
+                        '-threads', '0',
+                        '-thread_queue_size','4096',
+                        '-y',                        
+                         '-re',
+                        '-f', 'rawvideo',  # fake video input then write image to stdin late
+                        '-pixel_format', 'bgr24',
+                        '-s', f"{sharedVidWidth.value}x{sharedVidHeight.value}",
+                        # '-s','320x240',
+                        '-framerate', f"{sharedVidFps.value}",
+                        #'-i',   f"{self.pipeVid}",
+                        #'-hwaccel','auto',
+                        '-i', '-',  # write image input  with stdin
 
-    pipeFfmpegProc = subprocess.Popen(app.command, shell=False, stdin=subprocess.PIPE,
-                                      #stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL
-                                      )
+                        # # slience sound
+                        #'-re',
+                        #'-f', 'lavfi',
+                        #'-i', 'anullsrc',
+
+                        # sound from file
+                        #'-re',
+                        # '-stream_loop', '-1',
+                        # '-i', '1.mp3',#from file
+
+                        # from mic
+                        '-re',
+                          '-f', 'alsa',
+                          '-ac', '2' ,
+                          '-itsoffset', '00:00:00.1',
+                          '-i','default',
+
+                        # '-re',
+                        # '-f', 'lavfi',
+                        # #'-i', f"{self.pipeAud}",#not working yet, try to write stream from stdin
+                        # '-i','-',
+                        
+                        '-c:v', 'libx264',  # mp4 format
+                        '-vf', 'yadif,format=yuv420p,setsar=1:1',
+                        # key frame https://support.google.com/youtube/answer/2853702?hl=en#zippy=%2Cp
+                        
+                        '-force_key_frames', 'expr:gte(t,n_forced/2)',
+                        
+                       # '-force_key_frames', 'expr:gte(t,n_forced*2)'
+                        
+                        '-keyint_min', f"{sharedVidFps.value}",
+                        '-x264opts', f"keyint={sharedVidFps_g.value}:min-keyint={sharedVidFps.value}:no-scenecut",
+                        '-sc_threshold', '40',
+                        '-reorder_queue_size', '4096',
+                        '-max_delay', '500000',  # 0.5sec
+                        '-pix_fmt', 'yuv420p',  # optimize mp4 format
+                        #'-vf', 'format=yuv420p,setsar=1:1,scale=-1:720',
+                        #'-vf', f'format=yuv420p,setsar=1:1,crop={self.vidCropW}:{self.vidCropH}:0:0',
+                        # '-s','320x240',
+                        '-tune', 'zerolatency',
+                        '-vprofile', 'baseline',                        
+                        '-preset', 'veryfast',
+                        '-async', '1',
+                        '-bf', '2',
+                        '-use_editlist', '0',
+                        # https://wiki.multimedia.cx/index.php/FFmpeg_Metadata
+                        '-metadata', 'copyright=dunp',
+                        '-metadata', 'author=dunp',
+                        '-metadata', 'album_artist=dunp',
+                        '-metadata', 'album=dunp',
+                        '-metadata', 'comment=dunp',
+                        '-metadata', 'title=dunp',
+                        '-metadata', 'year=2010',
+
+                        '-c:a', 'aac',
+                        '-g', f"{sharedVidFps.value}",
+                        '-b:v', '2048k',  # https://support.google.com/youtube/answer/2853702?hl=en#zippy=%2Cp
+                        #'-b:a', '96k',
+                        '-r', f"{ sharedVidFps.value}",
+                        '-crf', '28',  # https://trac.ffmpeg.org/wiki/Encode/H.264
+                        '-maxrate', '960k',
+                        '-bufsize', '2048k',  # https://trac.ffmpeg.org/wiki/EncodingForStreamingSites
+                        '-strict', 'experimental',
+                        #'-strict', '-2',
+                        '-movflags', '+faststart',  # support MAC os quick time to play
+                        '-flvflags', 'no_duration_filesize',                        
+                        '-flags', '+global_header',
+                        "-x264opts","opencl",
+                        
+                        #'-fflags','nobuffer',
+                        #'-probesize','32',
+                        #'-analyzeduration','0',
+                        
+
+                        # ## youtube live ok
+                        # '-f', 'flv',
+                        #  rtmp
+
+                        # # convert to .gif work oki                    https://superuser.com/questions/556029/how-do-i-convert-a-video-to-gif-using-ffmpeg-with-reasonable-quality
+                        # '-an',
+                        # ##'-vf', "scale=320:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse",
+                        # '-f', 'image2pipe',
+                        # 'convert ',
+                        # '-delay', '10',
+                        # '-loop', '0',
+                        # "xxx.gif"
+
+                        # # localhost live ok
+                         '-f', 'mpegts',
+                         "udp://127.0.0.1:7234"
+                        # #    #ffplay udp://127.0.0.1:7234
+                        # #    #vlc udp://@127.0.0.1:7234
+                        
+                        ## stream through http m3u8stream/index.html
+                        # '-f','hls',
+                        # '-hls_time','10',
+                        # '-segment_time','10',
+                        # '-hls_list_size','10',
+                        # '/m3u8stream/stream.m3u8'
+
+                        # #save to file
+                        #"/work/cameraip2youtubelive/program.mp4"
+                        ]
+
     lastframe = cv2.imread("du.png")
 
-    lastframe = cv2.resize(lastframe, (app.vidW, app.vidH), cv2.INTER_CUBIC)
+    lastframe = cv2.resize(lastframe, (sharedVidWidth.value, sharedVidHeight.value), cv2.INTER_CUBIC)
+    
+    qsize= shared_framequeue_preprocess.qsize()
+    print("shared_framequeue_preprocess", qsize)    
+    for i in range(qsize):
+        shared_framequeue_preprocess.get()        
+        
+    qsize= sharedCameraQueueCaptured.qsize()
+    print("sharedCameraQueueCaptured", qsize)    
+    for i in range(qsize):
+        sharedCameraQueueCaptured.get()
 
-    while app.appIsStop == False:
+    print("reset done -> begin stream")
+    
+    print(command)
+    
+    pipeFfmpegProc = subprocess.Popen(command, shell=False, stdin=subprocess.PIPE,
+                                      #stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL
+                                      )
+    
+    time.sleep(1)
+    
+    dtcheckEmptyQueue=datetime.datetime.now()
+
+    while sharedIsStoped.value == 0:
         try:
-            qsize = app.framequeue_preprocess.qsize()
-
+            
+            qsize = shared_framequeue_preprocess.qsize()
+            
             if qsize <= 0:
                 frame = lastframe
+                # dtnow= datetime.datetime.now()
+                # timedif= dtnow- dtcheckEmptyQueue
+                # if timedif.total_seconds()>3:
+                #     dtcheckEmptyQueue=datetime.datetime.now()
+                #     frame = lastframe
             else:
-                rem = qsize - app.fps
+                rem = qsize - sharedVidFps.value
                 if rem > 0:
                     print(
-                        f"check to remove: app.frame/process: {app.framequeue.qsize()} / {app.framequeue_preprocess.qsize()}")
+                        f"check to remove: app.frame/process: {sharedCameraQueueCaptured.qsize()} / {shared_framequeue_preprocess.qsize()}")
 
                     for i in range(rem):
-                        app.framequeue_preprocess.get()
+                        shared_framequeue_preprocess.get()
 
-                frame = app.framequeue_preprocess.get()
+                frame = shared_framequeue_preprocess.get()
 
-            proc_write_pipe(pipeFfmpegProc, app.pipeVid, frame.tobytes())
+            #proc_write_pipe(pipeFfmpegProc, "pipeVid.mp4", frame.tobytes())            
             #proc_write_pipe(pipeFfmpegProc, app.pipeAud, streamAud.read(chunk))
+            stdinBytes=frame.tobytes()
+            if len(stdinBytes)==0:
+                print("stream_youtube", "no bytes")
+                continue
+            pipeFfmpegProc.stdin.write(stdinBytes)
 
             lastframe = frame
 
             #cv2.imshow("", frame)
             # cv2.waitKey(20)
-            time.sleep(app.fps_sleep)  # keep fps
+            time.sleep(sharedVidFps_sleep.value)  # keep fps
         except Exception as ex:
-            print(ex)
-            raise(ex)
+            print("stream_youtube", ex)
+            
             pass
 
     pipeFfmpegProc.terminate()
@@ -457,60 +608,87 @@ def video_preprocess():
     zoomQueue = Queue()
     rotateQueue = Queue()
 
-    trotate = Thread(target=video_preprocess_rotate,
-                     args=(app.vidW,app.vidH, rotateQueue,), daemon=True)
-    trotate.start()
+    # trotate = Thread(target=video_preprocess_rotate,
+    #                  args=(app.vidW,app.vidH, rotateQueue,), daemon=True)
+    # #trotate.start()
     
     
-    tzoom = Thread(target=video_preprocess_zoom,
-                     args=(app.vidW,app.vidH, zoomQueue,), daemon=True)
-    tzoom.start()
+    # tzoom = Thread(target=video_preprocess_zoom,
+    #                  args=(app.vidW,app.vidH, zoomQueue,), daemon=True)
+    # #tzoom.start()
     
-    while app.appIsStop == False:
-        frame = app.framequeue.get()
-
-        frame = cv2_draw_contours(frame)
+    while sharedIsStoped.value == 0:
+        
+        frame = sharedCameraQueueCaptured.get()
         
         try:
-            (imgr, hir, wir) = rotateQueue.get()
-            draw_overlay(frame, imgr, wir, hir, (0, 0, 0))
-        except:
+            
+            frame = cv2_draw_contours(frame)
+                    
+            # try:
+            #     (imgr, hir, wir) = rotateQueue.get()
+            #     draw_overlay(frame, imgr, wir, hir, (0, 0, 0))
+            # except:
+            #     pass
+            
+            # try:
+            #     (imgz, hiz, wiz) = zoomQueue.get()
+            #     draw_overlay(frame, imgz, wiz, hiz, None)
+            # except:
+                # pass
+            
+            #frame=cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
+            #frame=cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+            tnow = datetime.datetime.now()
+            cv2.putText(frame, f"Nguyen Phan Du {tnow}", (10, 20),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
+            cv2.putText(frame, f"Nguyen Phan Du {tnow}", (11, 21),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (69, 255, 0), 1)
+        except Exception as ex:
+            print(ex)
             pass
-        
-        try:
-            (imgz, hiz, wiz) = zoomQueue.get()
-            draw_overlay(frame, imgz, wiz, hiz, None)
-        except:
-            pass
-        
-        #frame=cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
-        #frame=cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
-        tnow = datetime.datetime.now()
-        cv2.putText(frame, f"Nguyen Phan Du {tnow}", (10, 20),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
-        cv2.putText(frame, f"Nguyen Phan Du {tnow}", (11, 21),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (69, 255, 0), 1)
 
-        app.framequeue_preprocess.put(frame)
+        shared_framequeue_preprocess.put(frame)
 
         # print(
-        #     f"app.frame/process: {app.framequeue.qsize()} / {app.framequeue_preprocess.qsize()}")
+        #          f"app.frame/process: {sharedCameraQueueCaptured.qsize()} / {shared_framequeue_preprocess.qsize()}")
 
-        time.sleep(0.01)
+        #time.sleep(0.01)
         pass
 
 
 def video_capture():
 
-    while app.appIsStop == False:
+    cap = cv2.VideoCapture(cameraip)
+
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    
+    print("org camera info:w:h:fps:", width, height, fps)
+
+    width=640
+    height=480
+    fps=24
+    
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH,width)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT,height)
+        
+    sharedVidWidth.value= width
+    sharedVidHeight.value= height
+    sharedVidFps.value=fps
+
+    print("camera info:w:h:fps:", width, height, fps)
+    
+    while sharedIsStoped.value == 0:
         try:
             if cap.isOpened() == False:
                 time.sleep(1)
                 continue
 
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                app.appIsStop = True
-                break
+            # if cv2.waitKey(1) & 0xFF == ord('q'):
+            #     sharedIsStoped.value=1
+            #     break
 
             for i in range(3):
                 success, frame = cap.read()
@@ -518,14 +696,16 @@ def video_capture():
             if success:
                 #frame= cv2.flip(frame,1)
 
-                app.framequeue.put(frame)
+                #app.framequeue.put(frame)
+                sharedCameraQueueCaptured.put(frame)
                 # pipe.communicate(frame.tobytes())
                 # pipe.stdin.write(streamAud.read(chunk))
 
                 #cv2.imshow("123", frame)
                 # cv2.waitKey(1)
-
-            time.sleep(app.fps_sleep)  # keep fps
+                
+            #time.sleep(app.fps_sleep)  # keep fps
+            #time.sleep(sharedVidFps_sleep.value) 
         except Exception as ex:
             print(ex)
             pass
@@ -536,16 +716,23 @@ def video_capture():
     cap.release()
 
 
-tyoutube = Thread(target=stream_youtube, args=(), daemon=True)
-tvid = Thread(target=video_capture, args=(), daemon=True)
-tpreprocess = Thread(target=video_preprocess, args=(), daemon=True)
 
+tvid =  multiprocessing.Process(target=video_capture, args=(), daemon=True)
 
 tvid.start()
 
-tpreprocess.start()
+time.sleep(2)
+
+tyoutube = multiprocessing.Process(target=stream_youtube, args=(), daemon=True)
 
 tyoutube.start()
+
+app = App(sharedVidWidth.value, sharedVidHeight.value, sharedVidFps.value)
+
+tpreprocess = Thread(target=video_preprocess, args=(), daemon=True)
+
+tpreprocess.start()
+
 
 tvid.join()
 
